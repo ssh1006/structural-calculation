@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>七层三跨框架内力计算工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">七层三跨框架内力计算工具</h1>
+        
+        <!-- 输入表单 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">基本参数输入</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">左跨跨长 L1 (m)</label>
+                    <input type="number" id="L1" value="6.0" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">中跨跨长 L2 (m)</label>
+                    <input type="number" id="L2" value="4.5" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">右跨跨长 L3 (m)</label>
+                    <input type="number" id="L3" value="6.0" step="0.1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">混凝土强度等级</label>
+                    <select id="concrete" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="C20">C20 (E=2.55×10⁴ N/mm²)</option>
+                        <option value="C25" selected>C25 (E=2.80×10⁴ N/mm²)</option>
+                        <option value="C30">C30 (E=3.00×10⁴ N/mm²)</option>
+                        <option value="C35">C35 (E=3.15×10⁴ N/mm²)</option>
+                        <option value="C40">C40 (E=3.25×10⁴ N/mm²)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">设防烈度</label>
+                    <select id="intensity" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="6">6度 (αmax=0.04)</option>
+                        <option value="7" selected>7度 (αmax=0.08)</option>
+                        <option value="8">8度 (αmax=0.16)</option>
+                        <option value="9">9度 (αmax=0.32)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">每层构件尺寸（独立层高+四柱三跨）</h3>
+            <div class="overflow-x-auto mb-6">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">楼层</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">层高h(m)</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">A柱截面</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">B柱截面</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">C柱截面</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">D柱截面</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">AB梁(左跨)</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">BC梁(中跨)</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">CD梁(右跨)</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">板厚(mm)</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">恒载</th>
+                            <th class="px-2 py-2 text-left font-medium text-gray-500">活载</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="memberTable"></tbody>
+                </table>
+            </div>
+            
+            <div class="flex justify-center">
+                <button id="calculateBtn" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                    开始计算
+                </button>
+            </div>
+            <div id="loading" class="hidden text-center text-blue-600 mt-4">计算中，请稍候...</div>
+        </div>
+        
+        <!-- 计算结果 -->
+        <div id="results" class="hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">计算结果</h2>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">线刚度计算结果</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-3 py-2 text-xs">构件</th>
+                                <th class="px-3 py-2 text-xs">线刚度(×10¹⁰)</th>
+                                <th class="px-3 py-2 text-xs">相对刚度</th>
+                            </tr></thead>
+                            <tbody id="stiffnessTable" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">地震作用计算结果</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-3 py-2 text-xs">楼层</th>
+                                <th class="px-3 py-2 text-xs">重力荷载(kN)</th>
+                                <th class="px-3 py-2 text-xs">水平地震力(kN)</th>
+                                <th class="px-3 py-2 text-xs">楼层剪力(kN)</th>
+                            </tr></thead>
+                            <tbody id="earthquakeTable" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">框架弯矩图 (kN·m)</h3>
+                    <div class="relative w-full border rounded p-2 bg-white" style="height:700px;">
+                        <canvas id="momentDiagram"></canvas>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">柱端弯矩 (kN·m)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-2 py-2 text-xs">楼层</th>
+                                <th class="px-2 py-2 text-xs">A柱上</th><th class="px-2 py-2 text-xs">A柱下</th>
+                                <th class="px-2 py-2 text-xs">B柱上</th><th class="px-2 py-2 text-xs">B柱下</th>
+                                <th class="px-2 py-2 text-xs">C柱上</th><th class="px-2 py-2 text-xs">C柱下</th>
+                                <th class="px-2 py-2 text-xs">D柱上</th><th class="px-2 py-2 text-xs">D柱下</th>
+                            </tr></thead>
+                            <tbody id="columnMomentTable" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">梁端弯矩 (kN·m)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50"><tr>
+                                <th class="px-2 py-2 text-xs">楼层</th>
+                                <th class="px-2 py-2 text-xs">AB左</th><th class="px-2 py-2 text-xs">AB右</th>
+                                <th class="px-2 py-2 text-xs">BC左</th><th class="px-2 py-2 text-xs">BC右</th>
+                                <th class="px-2 py-2 text-xs">CD左</th><th class="px-2 py-2 text-xs">CD右</th>
+                            </tr></thead>
+                            <tbody id="beamMomentTable" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center gap-4 flex-wrap">
+                    <button id="downloadMomentBtn" class="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">下载弯矩图</button>
+                    <button id="downloadAllBtn" class="px-6 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">导出全部结果</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化每层：独立层高 + 四柱三跨
+        function initTables() {
+            const memberTable = document.getElementById('memberTable');
+            memberTable.innerHTML = '';
+            for (let i = 7; i >= 1; i--) {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="px-2 py-2 whitespace-nowrap">第${i}层</td>
+                    <td class="px-2 py-2"><input type="number" value="3.6" step="0.1" class="w-20 border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="500×500" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="500×500" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="500×500" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="500×500" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="250×600" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="250×550" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="text" value="250×600" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="number" value="120" step="10" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="number" value="4.5" step="0.1" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                    <td class="px-2 py-2"><input type="number" value="2.0" step="0.1" class="w-full border rounded px-1 py-0.5 text-sm"></td>
+                `;
+                memberTable.appendChild(row);
+            }
+        }
+        
+        // 解析截面
+        function parseSection(str) {
+            try {
+                const parts = str.split('×').map(Number);
+                return { b: parts[0] || 500, h: parts[1] || 500 };
+            } catch { return { b: 500, h: 500 }; }
+        }
+        
+        // 材料参数
+        function getElasticModulus(grade) {
+            const E = {'C20':2.55e4,'C25':2.80e4,'C30':3.00e4,'C35':3.15e4,'C40':3.25e4};
+            return E[grade] * 1e3;
+        }
+        function getAlphaMax(intensity) {
+            const a = {'6':0.04,'7':0.08,'8':0.16,'9':0.32};
+            return a[intensity];
+        }
+        
+        // 线刚度
+        function calcStiff(E, sec, L) {
+            const I = sec.b * sec.h**3 / 12;
+            return E * I / L;
+        }
+        
+        // 输入校验
+        function validateInput() {
+            const L1=+document.getElementById('L1').value, L2=+document.getElementById('L2').value, L3=+document.getElementById('L3').value;
+            if(isNaN(L1)||L1<=0||isNaN(L2)||L2<=0||isNaN(L3)||L3<=0){alert("请输入有效跨长！");return false;}
+            const hs = Array.from(document.querySelectorAll('#memberTable tr input:nth-child(2)')).map(i=>+i.value);
+            for(const h of hs) if(isNaN(h)||h<=0){alert("请输入有效层高！");return false;}
+            return true;
+        }
+
+        // 主计算
+        function calculate() {
+            if(!validateInput()) return;
+            const btn = document.getElementById('calculateBtn');
+            const loading = document.getElementById('loading');
+            btn.disabled = true; loading.classList.remove('hidden');
+            
+            setTimeout(()=>{
+                // 跨长
+                const L1=+document.getElementById('L1').value*1000, L2=+document.getElementById('L2').value*1000, L3=+document.getElementById('L3').value*1000;
+                const E = getElasticModulus(document.getElementById('concrete').value);
+                const αmax = getAlphaMax(document.getElementById('intensity').value);
+                
+                // 读取每层：层高 + 四柱三跨
+                const floors = [];
+                document.querySelectorAll('#memberTable tr').forEach((tr,idx)=>{
+                    const i=tr.querySelectorAll('input');
+                    floors.push({
+                        floor:7-idx,
+                        h:+i[0].value*1000,
+                        colA:parseSection(i[1].value),colB:parseSection(i[2].value),colC:parseSection(i[3].value),colD:parseSection(i[4].value),
+                        beamAB:parseSection(i[5].value),beamBC:parseSection(i[6].value),beamCD:parseSection(i[7].value),
+                        slab:+i[8].value, dead:+i[9].value, live:+i[10].value
+                    });
+                });
+                floors.reverse(); // 1~7层
+                
+                // 线刚度
+                const stiff = [];
+                floors.forEach((f,idx)=>{
+                    const cA=calcStiff(E,f.colA,f.h),cB=calcStiff(E,f.colB,f.h),cC=calcStiff(E,f.colC,f.h),cD=calcStiff(E,f.colD,f.h);
+                    const bAB=calcStiff(E,f.beamAB,L1),bBC=calcStiff(E,f.beamBC,L2),bCD=calcStiff(E,f.beamCD,L3);
+                    stiff.push({cA,cB,cC,cD,bAB,bBC,bCD});
+                });
+                
+                // 地震
+                const eq = [];
+                let totalG=0, sumH=0;
+                let curH=0;
+                floors.forEach(f=>{
+                    const area = (L1+L2+L3)/1000 * 6;
+                    const G = (f.slab/1000*25 + f.dead + f.live*0.5) * area;
+                    totalG += G;
+                    eq.push({f:f.floor, G:G, F:0, V:0, h:f.h, curH});
+                    sumH += G * curH;
+                    curH += f.h;
+                });
+                const Feq = αmax * 0.85*totalG;
+                eq.forEach(it=>it.F=Feq*(it.G*it.curH)/sumH);
+                let V=0; for(let i=eq.length-1;i>=0;i--){V+=eq[i].F;eq[i].V=V;}
+                
+                // 柱弯矩
+                const colM = [];
+                eq.forEach((it,idx)=>{
+                    const v = it.V/4;
+                    const m = v * it.h/1000 * 0.5;
+                    colM.push({floor:it.f, At:m,Ab:m,Bt:m,Bb:m,Ct:m,Cb:m,Dt:m,Db:m});
+                });
+                
+                // 梁弯矩
+                const beamM = [];
+                floors.forEach((f,idx)=>{
+                    const up = idx>0 ? colM[idx-1] : null;
+                    const now = colM[idx];
+                    const A = now.At + (up?up.Ab:0);
+                    const B = now.Bt + (up?up.Bb:0);
+                    const C = now.Ct + (up?up.Cb:0);
+                    const D = now.Dt + (up?up.Db:0);
+                    const s = stiff[idx];
+                    const B1 = B * s.bAB/(s.bAB+s.bBC || 1);
+                    const B2 = B * s.bBC/(s.bAB+s.bBC || 1);
+                    const C1 = C * s.bBC/(s.bBC+s.bCD || 1);
+                    const C2 = C * s.bCD/(s.bBC+s.bCD || 1);
+                    beamM.push({floor:f.floor, ABL:A, ABR:B1, BCL:B2, BCR:C1, CDL:C2, CDR:D});
+                });
+                
+                showResults(stiff,eq,colM,beamM,L1,L2,L3,floors);
+                btn.disabled=false; loading.classList.add('hidden');
+            },400);
+        }
+        
+        function showResults(stiff,eq,colM,beamM,L1,L2,L3,floors){
+            // 线刚度
+            const st = document.getElementById('stiffnessTable'); st.innerHTML='';
+            const ref = stiff[0].cA;
+            [
+                [stiff[0].cA,'A柱'],[stiff[0].cB,'B柱'],[stiff[0].cC,'C柱'],[stiff[0].cD,'D柱'],
+                [stiff[0].bAB,'AB梁'],[stiff[0].bBC,'BC梁'],[stiff[0].bCD,'CD梁']
+            ].forEach(([v,n])=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`<td class="px-3 py-1">${n}</td><td class="px-3 py-1">${(v/1e10).toFixed(4)}</td><td class="px-3 py-1">${(v/ref).toFixed(4)}</td>`;
+                st.appendChild(tr);
+            });
+            
+            // 地震
+            const et=document.getElementById('earthquakeTable'); et.innerHTML='';
+            eq.forEach(it=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`<td class="px-3 py-1">${it.f}层</td><td class="px-3 py-1">${it.G.toFixed(1)}</td><td class="px-3 py-1">${it.F.toFixed(1)}</td><td class="px-3 py-1">${it.V.toFixed(1)}</td>`;
+                et.appendChild(tr);
+            });
+            
+            // 柱
+            const ct=document.getElementById('columnMomentTable'); ct.innerHTML='';
+            colM.forEach(it=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`<td class="px-2 py-1">${it.floor}层</td>
+                    <td class="px-2 py-1">${it.At.toFixed(1)}</td><td class="px-2 py-1">${it.Ab.toFixed(1)}</td>
+                    <td class="px-2 py-1">${it.Bt.toFixed(1)}</td><td class="px-2 py-1">${it.Bb.toFixed(1)}</td>
+                    <td class="px-2 py-1">${it.Ct.toFixed(1)}</td><td class="px-2 py-1">${it.Cb.toFixed(1)}</td>
+                    <td class="px-2 py-1">${it.Dt.toFixed(1)}</td><td class="px-2 py-1">${it.Db.toFixed(1)}</td>`;
+                ct.appendChild(tr);
+            });
+            
+            // 梁
+            const bt=document.getElementById('beamMomentTable'); bt.innerHTML='';
+            beamM.forEach(it=>{
+                const tr=document.createElement('tr');
+                tr.innerHTML=`<td class="px-2 py-1">${it.floor}层</td>
+                    <td class="px-2 py-1">${it.ABL.toFixed(1)}</td><td class="px-2 py-1">${it.ABR.toFixed(1)}</td>
+                    <td class="px-2 py-1">${it.BCL.toFixed(1)}</td><td class="px-2 py-1">${it.BCR.toFixed(1)}</td>
+                    <td class="px-2 py-1">${it.CDL.toFixed(1)}</td><td class="px-2 py-1">${it.CDR.toFixed(1)}</td>`;
+                bt.appendChild(tr);
+            });
+            
+            drawMoment(colM,beamM,L1,L2,L3,floors);
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('results').scrollIntoView({behavior:'smooth'});
+        }
+        
+        // 修复弯矩图绘制
+        function drawMoment(colM,beamM,L1,L2,L3,floors){
+            const cv=document.getElementById('momentDiagram');
+            const ctx=cv.getContext('2d');
+            const wrapper = cv.parentElement;
+            cv.width = wrapper.clientWidth;
+            cv.height = wrapper.clientHeight;
+            
+            const W = cv.width, H = cv.height;
+            const m = {t:50, b:30, l:60, r:30};
+            const totalX = L1+L2+L3;
+            let totalY = 0; floors.forEach(f=>totalY+=f.h);
+            const sx = (W-m.l-m.r)/totalX;
+            const sy = (H-m.t-m.b)/totalY;
+            const X = [0, L1, L1+L2, totalX];
+            
+            let yPos = [];
+            let cur = 0; yPos.push(cur);
+            floors.forEach(f=>{cur+=f.h; yPos.push(cur);});
+            
+            const px = x => m.l + x*sx;
+            const py = y => m.t + (H-m.t-m.b) - y*sy;
+            
+            ctx.clearRect(0,0,W,H);
+            ctx.lineWidth=2; ctx.strokeStyle='#222';
+            
+            // 画柱
+            X.forEach(xp=>{
+                for(let i=0;i<7;i++){
+                    const y1 = yPos[i], y2 = yPos[i+1];
+                    ctx.beginPath();
+                    ctx.moveTo(px(xp), py(y1));
+                    ctx.lineTo(px(xp), py(y2));
+                    ctx.stroke();
+                }
+            });
+            // 画梁
+            for(let i=1;i<=7;i++){
+                const yh = yPos[i];
+                ctx.beginPath();
+                ctx.moveTo(px(0), py(yh));
+                ctx.lineTo(px(totalX), py(yh));
+                ctx.stroke();
+            }
+            
+            // 标注
+            ctx.fillStyle='#222'; ctx.font='14px Arial';
+            ctx.fillText('A',px(X[0])-8,py(0)+20);
+            ctx.fillText('B',px(X[1])-8,py(0)+20);
+            ctx.fillText('C',px(X[2])-8,py(0)+20);
+            ctx.fillText('D',px(X[3])-8,py(0)+20);
+            for(let i=1;i<=7;i++) ctx.fillText(`${i}层`,px(0)-35,py(yPos[i])+5);
+            
+            // 弯矩
+            ctx.strokeStyle='#d32f2f'; ctx.lineWidth=1.5; ctx.fillStyle='#d32f2f'; ctx.font='11px Arial';
+            const maxM = 60;
+            const ofsC = 2500 / maxM;
+            const ofsB = 2000 / maxM;
+            
+            // 柱弯矩
+            X.forEach((xp, j)=>{
+                const name = ['A','B','C','D'][j];
+                for(let i=0;i<7;i++){
+                    const m = colM[i];
+                    const mt = m[`${name}t`];
+                    const mb = m[`${name}b`];
+                    const y1 = yPos[i], y2 = yPos[i+1];
+                    ctx.beginPath(); ctx.moveTo(px(xp), py(y2)); ctx.lineTo(px(xp)+mt*ofsC, py(y2)); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(px(xp), py(y1)); ctx.lineTo(px(xp)+mb*ofsC, py(y1)); ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(px(xp)+mt*ofsC, py(y2));
+                    ctx.lineTo(px(xp), py((y1+y2)/2));
+                    ctx.lineTo(px(xp)+mb*ofsC, py(y1));
+                    ctx.stroke();
+                    ctx.fillText(mt.toFixed(1), px(xp)+mt*ofsC+8, py(y2)+4);
+                }
+            });
+            
+            // 梁弯矩
+            for(let i=0;i<7;i++){
+                const bm = beamM[i];
+                const yh = yPos[i+1];
+                // AB
+                ctx.beginPath();
+                ctx.moveTo(px(0), py(yh)-bm.ABL*ofsB);
+                ctx.quadraticCurveTo(px(L1/2), py(yh)-Math.max(bm.ABL,bm.ABR)*ofsB*1.3, px(L1), py(yh)-bm.ABR*ofsB);
+                ctx.stroke();
+                // BC
+                ctx.beginPath();
+                ctx.moveTo(px(L1), py(yh)-bm.BCL*ofsB);
+                ctx.quadraticCurveTo(px(L1+L2/2), py(yh)-Math.max(bm.BCL,bm.BCR)*ofsB*1.3, px(L1+L2), py(yh)-bm.BCR*ofsB);
+                ctx.stroke();
+                // CD
+                ctx.beginPath();
+                ctx.moveTo(px(L1+L2), py(yh)-bm.CDL*ofsB);
+                ctx.quadraticCurveTo(px(L1+L2+L3/2), py(yh)-Math.max(bm.CDL,bm.CDR)*ofsB*1.3, px(totalX), py(yh)-bm.CDR*ofsB);
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle='#111'; ctx.font='16px Arial';
+            ctx.fillText('七层三跨框架地震作用弯矩图', W/2-120, 25);
+        }
+        
+        // 下载图片
+        document.getElementById('downloadMomentBtn').onclick = () => {
+            const a = document.createElement('a');
+            a.download = '框架弯矩图.png';
+            a.href = document.getElementById('momentDiagram').toDataURL('image/png');
+            a.click();
+        };
+        document.getElementById('downloadAllBtn').onclick = () => alert('如需导出Excel可告知');
+        
+        document.getElementById('calculateBtn').onclick = calculate;
+        window.addEventListener('resize',()=>{
+            if(!document.getElementById('results').classList.contains('hidden')) calculate();
+        });
+        
+        initTables();
+    </script>
+</body>
+</html>
